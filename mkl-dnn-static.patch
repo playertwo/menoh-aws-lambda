@@ -1,0 +1,82 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index acad7eb..ba89223 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -57,6 +57,8 @@ set(CMAKE_SRC_CCXX_FLAGS)       # SRC specifics
+ set(CMAKE_EXAMPLE_CCXX_FLAGS)   # EXAMPLE specifics
+ set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
+
++set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
++
+ include("cmake/platform.cmake")
+ include("cmake/OpenMP.cmake")
+ include("cmake/SDL.cmake")
+diff --git a/cmake/MKL.cmake b/cmake/MKL.cmake
+index 57acaab..4614d9a 100644
+--- a/cmake/MKL.cmake
++++ b/cmake/MKL.cmake
+@@ -67,6 +67,16 @@ function(detect_mkl LIBNAME)
+         return()
+     endif()
+
++    find_library(MKLITLIB NAMES libmkl_intel_thread.a
++        HINTS   ${MKLROOT}/lib ${MKLROOT}/lib/intel64
++                $ENV{MKLROOT}/lib $ENV{MKLROOT}/lib/intel64
++                ${__mklinc_root}/lib ${__mklinc_root}/lib/intel64)
++
++    find_library(MKLIILPLIB NAMES libmkl_intel_ilp64.a
++        HINTS   ${MKLROOT}/lib ${MKLROOT}/lib/intel64
++                $ENV{MKLROOT}/lib $ENV{MKLROOT}/lib/intel64
++                ${__mklinc_root}/lib ${__mklinc_root}/lib/intel64)
++
+     if(WIN32)
+         set(MKLREDIST ${MKLINC}/../../redist/)
+         find_file(MKLDLL NAMES ${LIBNAME}.dll
+@@ -79,7 +89,7 @@ function(detect_mkl LIBNAME)
+         endif()
+     endif()
+
+-    if(UNIX AND LIBNAME MATCHES "mklml.*")
++    if(UNIX AND LIBNAME MATCHES "mkl_core*")
+         # Although MKL-ML depends on shared object functions such as dlopen and
+         # dladdr it is not linked against libdl. This causes link failures when
+         # MKL-DNN is build with the gold linker (e.g. -fuse-ld=gold).
+@@ -162,18 +172,24 @@ function(detect_mkl LIBNAME)
+     endif()
+ endfunction()
+
+-detect_mkl("mklml_intel")
++detect_mkl("mkl_core")
+ detect_mkl("mklml")
+ detect_mkl("mkl_rt")
+
+ if(HAVE_MKL)
+     add_definitions(-DUSE_MKL -DUSE_CBLAS)
+     include_directories(AFTER ${MKLINC})
++    list(APPEND mkldnn_LINKER_LIBS -Wl,--start-group)
+     list(APPEND mkldnn_LINKER_LIBS ${MKLLIB})
++    list(APPEND mkldnn_LINKER_LIBS ${MKLITLIB})
++    list(APPEND mkldnn_LINKER_LIBS ${MKLIILPLIB})
++    list(APPEND mkldnn_LINKER_LIBS -Wl,--end-group)
+
+     set(MSG "Intel(R) MKL:")
+     message(STATUS "${MSG} include ${MKLINC}")
+     message(STATUS "${MSG} lib ${MKLLIB}")
++    message(STATUS "${MSG} lib ${MKLITLIB}")
++    message(STATUS "${MSG} lib ${MKLIILPLIB}")
+     if(MKLIOMP5LIB)
+         message(STATUS "${MSG} OpenMP lib ${MKLIOMP5LIB}")
+     else()
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 6e8a76a..3c20355 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -65,7 +65,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+     endif()
+ endif()
+
+-add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
++add_library(${TARGET_NAME} STATIC ${HEADERS} ${SOURCES})
+ #Add mkldnn.dll to execution PATH
+ if(NOT(MINGW))
+     set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}\;${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}" PARENT_SCOPE)

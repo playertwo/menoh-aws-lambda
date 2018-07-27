@@ -1,0 +1,71 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e6d8397..12496e2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -40,6 +40,7 @@ set(EXTERNAL_DIR ${CMAKE_SOURCE_DIR}/external)
+ set(ONNX_DIR ${EXTERNAL_DIR}/onnx)
+ set(Protobuf_PROTOC_EXECUTABLE protoc CACHE STRING "protoc path")
+ include(FindProtobuf)
++set(Protobuf_USE_STATIC_LIBS ON)
+ find_package(Protobuf 2.6.1 REQUIRED)
+ include_directories(${PROTOBUF_INCLUDE_DIR})
+ execute_process(COMMAND git submodule update --init -- ${ONNX_DIR} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+diff --git a/cmake/FindMKLDNN.cmake b/cmake/FindMKLDNN.cmake
+index ca776c3..dd8a4de 100644
+--- a/cmake/FindMKLDNN.cmake
++++ b/cmake/FindMKLDNN.cmake
+@@ -1,15 +1,42 @@
+ find_path(MKLDNN_INCLUDE_DIR
+     NAMES mkldnn.hpp PATH_SUFFIXES mkldnn
+     PATHS
++        ${MKLDNN_PATH}/include
+         /usr/include
+         /usr/local/include)
+ find_library(MKLDNN_LIBRARY
+     NAMES mkldnn
+     PATHS
++        ${MKLDNN_PATH}/lib
++        /usr/lib
++        /usr/local/lib)
++find_library(MKLDNN_LIBRARY_IOMP
++    NAMES iomp5
++    PATHS
++        ${MKLDNN_PATH}/lib
++        /usr/lib
++        /usr/local/lib)
++find_library(MKLDNN_LIBRARY_CORE
++    NAMES mkl_core
++    PATHS
++        ${MKLDNN_PATH}/lib
++        /usr/lib
++        /usr/local/lib)
++find_library(MKLDNN_LIBRARY_ILP
++    NAMES mkl_intel_ilp64
++    PATHS
++        ${MKLDNN_PATH}/lib
++        /usr/lib
++        /usr/local/lib)
++find_library(MKLDNN_LIBRARY_IT
++    NAMES mkl_intel_thread
++    PATHS
++        ${MKLDNN_PATH}/lib
+         /usr/lib
+         /usr/local/lib)
+ include(FindPackageHandleStandardArgs)
+ find_package_handle_standard_args(MKLDNN DEFAULT_MSG
+     MKLDNN_LIBRARY MKLDNN_INCLUDE_DIR)
+ set(MKLDNN_INCLUDE_DIRS ${MKLDNN_INCLUDE_DIR})
+-set(MKLDNN_LIBRARIES ${MKLDNN_LIBRARY})
++set(MKLDNN_LIBRARIES -Wl,--start-group ${MKLDNN_LIBRARY} ${MKLDNN_LIBRARY_IOMP} ${MKLDNN_LIBRARY_CORE} ${MKLDNN_LIBRARY_ILP} ${MKLDNN_LIBRARY_IT} -Wl,--end-group dl pthread m)
++
+diff --git a/menoh/CMakeLists.txt b/menoh/CMakeLists.txt
+index 975fcbc..ebc8754 100644
+--- a/menoh/CMakeLists.txt
++++ b/menoh/CMakeLists.txt
+@@ -1,6 +1,6 @@
+ file(GLOB_RECURSE SOURCES "." "*.cpp")
+ add_library(menoh ${SOURCES} ${ONNX_PROTO_SRC} ${ONNX_PROTO_HEADER})
+-target_link_libraries(menoh ${MKLDNN_LIBRARY} ${PROTOBUF_LIBRARY})
++target_link_libraries(menoh ${MKLDNN_LIBRARIES} ${PROTOBUF_LIBRARY})
+ set_source_files_properties(${ONNX_PROTO_SRC} PROPERTIES GENERATED TRUE)
+ set_source_files_properties(${ONNX_PROTO_HEADER} PROPERTIES GENERATED TRUE)
