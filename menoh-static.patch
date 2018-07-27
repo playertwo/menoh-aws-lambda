@@ -1,15 +1,16 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index e6d8397..12496e2 100644
+index e6d8397..642fe7a 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -40,6 +40,7 @@ set(EXTERNAL_DIR ${CMAKE_SOURCE_DIR}/external)
- set(ONNX_DIR ${EXTERNAL_DIR}/onnx)
- set(Protobuf_PROTOC_EXECUTABLE protoc CACHE STRING "protoc path")
- include(FindProtobuf)
-+set(Protobuf_USE_STATIC_LIBS ON)
- find_package(Protobuf 2.6.1 REQUIRED)
- include_directories(${PROTOBUF_INCLUDE_DIR})
- execute_process(COMMAND git submodule update --init -- ${ONNX_DIR} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+@@ -28,7 +28,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang") # check Clang and AppleClang
+ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+     # using GCC
+     set(CMAKE_CXX_FLAGS_DEBUG "-g3 -O0 -pg -Wall -Wextra")
+-    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -s -DNDEBUG -march=native")
++    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -s -DNDEBUG -march=native -static-libstdc++")
+ endif()
+
+ include_directories("${PROJECT_SOURCE_DIR}")
 diff --git a/cmake/FindMKLDNN.cmake b/cmake/FindMKLDNN.cmake
 index ca776c3..dd8a4de 100644
 --- a/cmake/FindMKLDNN.cmake
@@ -69,3 +70,4 @@ index 975fcbc..ebc8754 100644
 +target_link_libraries(menoh ${MKLDNN_LIBRARIES} ${PROTOBUF_LIBRARY})
  set_source_files_properties(${ONNX_PROTO_SRC} PROPERTIES GENERATED TRUE)
  set_source_files_properties(${ONNX_PROTO_HEADER} PROPERTIES GENERATED TRUE)
+ 
