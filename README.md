@@ -1,6 +1,6 @@
 ## Build fat version of the Menoh on the Amazon Linux AMI which uses in the AWS lambda
 
-- Launch instance `amzn-ami-hvm-2017.03.1.20170812-x86_64-gp2 (ami-aa5ebdd2)`
+- Launch `r3.large` (this type use Intel(R) Xeon(R) CPU E5-2680 v2 @ 2.80GHz processors, which is used in lambda) instance `amzn-ami-hvm-2017.03.1.20170812-x86_64-gp2 (ami-aa5ebdd2)`
 - `sudo yum -y install git`
 - `git clone https://github.com/playertwo/menoh-aws-lambda.git`
 - `cd menoh-aws-lambda && ./build_menoh.sh http://registrationcenter-download.intel.com/___/l_mkl_2018.3.222.tgz`

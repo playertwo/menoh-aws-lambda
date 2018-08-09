@@ -1,0 +1,168 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 356fbbb9..ddbf1ef5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -65,7 +65,7 @@ enable_testing()
+ include_directories(include)
+ 
+ add_subdirectory(src)
+-add_subdirectory(examples)
++#add_subdirectory(examples)
+ add_subdirectory(tests)
+ 
+-install(FILES LICENSE DESTINATION share/doc/${LIB_NAME})
++#install(FILES LICENSE DESTINATION share/doc/${LIB_NAME})
+diff --git a/cmake/MKL.cmake b/cmake/MKL.cmake
+index 883fb21b..516b8998 100644
+--- a/cmake/MKL.cmake
++++ b/cmake/MKL.cmake
+@@ -59,10 +59,21 @@ function(detect_mkl LIBNAME)
+     endif()
+ 
+     get_filename_component(__mklinc_root "${MKLINC}" PATH)
+-    find_library(MKLLIB NAMES ${LIBNAME}
++    find_library(MKLITLIB NAMES libmkl_intel_thread.a
+         HINTS   ${MKLROOT}/lib ${MKLROOT}/lib/intel64
+                 $ENV{MKLROOT}/lib $ENV{MKLROOT}/lib/intel64
+                 ${__mklinc_root}/lib ${__mklinc_root}/lib/intel64)
++
++    find_library(MKLIILPLIB NAMES libmkl_intel_ilp64.a
++        HINTS   ${MKLROOT}/lib ${MKLROOT}/lib/intel64
++                $ENV{MKLROOT}/lib $ENV{MKLROOT}/lib/intel64
++                ${__mklinc_root}/lib ${__mklinc_root}/lib/intel64)
++
++    find_library(MKLLIB NAMES lib${LIBNAME}.a ${LIBNAME}
++        HINTS   ${MKLROOT}/lib ${MKLROOT}/lib/intel64
++                $ENV{MKLROOT}/lib $ENV{MKLROOT}/lib/intel64
++                ${__mklinc_root}/lib ${__mklinc_root}/lib/intel64)
++
+     if(NOT MKLLIB)
+         return()
+     endif()
+@@ -79,10 +90,18 @@ function(detect_mkl LIBNAME)
+         endif()
+     endif()
+ 
++    #if(UNIX AND LIBNAME MATCHES "mklml.*")
++        # Although MKL-ML depends on shared object functions such as dlopen and
++        # dladdr it is not linked against libdl. This causes link failures when
++        # MKL-DNN is build with the gold linker (e.g. -fuse-ld=gold).
++    list(APPEND EXTRA_LIBS dl)
++    set(EXTRA_LIBS "${EXTRA_LIBS}" PARENT_SCOPE)
++    #endif()
++
+     if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+         get_filename_component(MKLLIBPATH ${MKLLIB} PATH)
+         find_library(MKLIOMP5LIB
+-            NAMES "iomp5" "iomp5md" "libiomp5" "libiomp5md"
++            NAMES "libiomp5.a" "iomp5" "iomp5md" "libiomp5" "libiomp5md"
+             HINTS   ${MKLLIBPATH}
+                     ${MKLLIBPATH}/../../lib
+                     ${MKLLIBPATH}/../../../lib/intel64
+@@ -144,18 +163,31 @@ function(detect_mkl LIBNAME)
+     endif()
+ endfunction()
+ 
+-detect_mkl("mklml_intel")
+-detect_mkl("mklml")
+-detect_mkl("mkl_rt")
++# detect_mkl("mklml_intel")
++# detect_mkl("mklml")
++#detect_mkl("mkl_rt")
++ # static library
++detect_mkl("mkl_core")
++# detect_mkl("mkl_intel_ilp64")
++# detect_mkl("mkl_intel_thread")
++# detect_mkl("mkl_sequential")
++# detect_mkl("mkl_tbb_thread")
++
+ 
+ if(HAVE_MKL)
+     add_definitions(-DUSE_MKL -DUSE_CBLAS)
+     include_directories(AFTER ${MKLINC})
++    list(APPEND mkldnn_LINKER_LIBS -Wl,--start-group)
+     list(APPEND mkldnn_LINKER_LIBS ${MKLLIB})
++    list(APPEND mkldnn_LINKER_LIBS ${MKLITLIB})
++    list(APPEND mkldnn_LINKER_LIBS ${MKLIILPLIB})
++    list(APPEND mkldnn_LINKER_LIBS -Wl,--end-group)
+ 
+     set(MSG "Intel(R) MKL:")
+     message(STATUS "${MSG} include ${MKLINC}")
+     message(STATUS "${MSG} lib ${MKLLIB}")
++    message(STATUS "${MSG} lib ${MKLITLIB}")
++    message(STATUS "${MSG} lib ${MKLIILPLIB}")
+     if(MKLIOMP5LIB)
+         message(STATUS "${MSG} OpenMP lib ${MKLIOMP5LIB}")
+     else()
+@@ -181,4 +213,3 @@ else()
+         "set of libraries or get a full version from "
+         "https://software.intel.com/en-us/intel-mkl")
+ endif()
+-
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 95fb94ab..ed75185e 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -52,14 +52,33 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+ endif()
+ endif()
+ 
+-add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
++#add_library(${TARGET_NAME} SHARED ${HEADERS} ${SOURCES})
++add_library(${TARGET_NAME} STATIC ${HEADERS} ${SOURCES})
+ #Add mkldnn.dll to execution PATH
+-set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}\;${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
++if(NOT(MINGW))
++    set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}\;${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}" PARENT_SCOPE)
++else()
++    # CMake with "MSYS Makefiles" generator seems to build libmkldnn.dll in a directory without build type.
++    set(CTESTCONFIG_PATH "${CTESTCONFIG_PATH}\;${CMAKE_CURRENT_BINARY_DIR}" PARENT_SCOPE)
++endif()
++
++# set_target_properties(${TARGET_NAME} PROPERTIES
++#        LINK_FLAGS "-Wl,--whole-archive"
++#    )
++
+ target_link_libraries(${TARGET_NAME} ${${TARGET_NAME}_LINKER_LIBS} ${EXTRA_LIBS})
+ set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 11)
+ set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+ set_property(TARGET ${TARGET_NAME} PROPERTY VERSION "${PROJECT_VERSION}.0")
+ set_property(TARGET ${TARGET_NAME} PROPERTY SOVERSION "0")
+ 
+-install(TARGETS ${TARGET_NAME} DESTINATION lib${LIB_SUFFIX})
++if(MINGW)
++    # We need to install *.dll into bin/ and *.a into lib/.
++    install(TARGETS ${TARGET_NAME}
++        RUNTIME DESTINATION bin
++        ARCHIVE DESTINATION lib${LIB_SUFFIX}
++    )
++else()
++    install(TARGETS ${TARGET_NAME} DESTINATION lib${LIB_SUFFIX})
++endif()
+ install(FILES ${HEADERS} DESTINATION include)
+diff --git a/src/cpu/xbyak/xbyak_util.h b/src/cpu/xbyak/xbyak_util.h
+index 713c68db..f55f1c8e 100644
+--- a/src/cpu/xbyak/xbyak_util.h
++++ b/src/cpu/xbyak/xbyak_util.h
+@@ -182,6 +182,7 @@ class Cpu {
+ 					* (extractBit(data[1], 0, 11) + 1)
+ 					* (data[2] + 1);
+ 				if (cacheType == DATA_CACHE && smt_width == 0) smt_width = nb_logical_cores;
++				smt_width = (std::min)(smt_width, nb_logical_cores);
+ 				assert(smt_width != 0);
+ 				cores_sharing_data_cache[data_cache_levels] = nb_logical_cores / smt_width;
+ 				data_cache_levels++;
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 32cd4bb4..a05d406d 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -47,7 +47,8 @@ endif()
+ 
+ add_executable(api-c api.c)
+ set_property(TARGET api-c PROPERTY C_STANDARD 99)
+-target_link_libraries(api-c ${LIB_NAME} ${EXTRA_LIBS})
++#target_link_libraries(api-c ${LIB_NAME} ${EXTRA_LIBS})
++target_link_libraries(api-c ${LIB_NAME} ${${LIB_NAME}_LINKER_LIBS} ${EXTRA_LIBS})
+ add_test(api-c api-c)
+ 
+ if(WIN32)

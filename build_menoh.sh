@@ -1,7 +1,8 @@
 #!/bin/sh
 
-MKLDNN_TAG="master"
-MKLDNN_COMMIT="a46b870"
+MKLDNN_TAG="v0.14"
+#MKLDNN_TAG="master"
+#MKLDNN_COMMIT="a46b870"
 MENOH_TAG="v1.0.3"
 PROTOBUF_TAG="v3.6.0"
 
@@ -55,8 +56,9 @@ fi
 if [ ! -d mkl-dnn ]; then
   git clone --branch $MKLDNN_TAG --depth=1 https://github.com/intel/mkl-dnn.git
   cd mkl-dnn
-  git checkout $MKLDNN_COMMIT
-  git apply $HOME/menoh-aws-lambda/mkl-dnn-static.patch
+  #git checkout $MKLDNN_COMMIT
+  #git apply $HOME/menoh-aws-lambda/mkl-dnn-static.patch
+  git apply $HOME/menoh-aws-lambda/mkl-dnn-static_0_14.patch
   mkdir build && cd build
   cmake3 ..
   make -j$JOBS && sudo make install
@@ -65,12 +67,11 @@ if [ ! -d mkl-dnn ]; then
 fi
 
 if [ ! -d menoh ]; then
-  git clone --branch $MENOH_TAG --depth=1 https://github.com/pfnet-research/menoh.git
-  #git clone --branch skip_flatten --depth=1 https://github.com/playertwo/menoh.git
+  #git clone --branch $MENOH_TAG --depth=1 https://github.com/pfnet-research/menoh.git
+  git clone --branch skip_flatten --depth=1 https://github.com/playertwo/menoh.git
   cd menoh
   if $TEST ; then
     mkdir data
-    export PATH=$PATH:/usr/local/bin
     sudo env "PATH=$PATH" pip install --upgrade pip
     sudo env "PATH=$PATH" pip install chainer
     python gen_test_data.py
